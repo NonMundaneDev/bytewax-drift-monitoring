@@ -2,3 +2,4 @@
 /app/model/rdfmodel.joblib.dat
 /app/data/train_data.csv
 __pycache__
+venv
