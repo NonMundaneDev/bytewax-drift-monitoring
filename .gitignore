@@ -1,0 +1,4 @@
+/app/model/pipeline_model.joblib
+/app/model/rdfmodel.joblib.dat
+/app/data/train_data.csv
+__pycache__
