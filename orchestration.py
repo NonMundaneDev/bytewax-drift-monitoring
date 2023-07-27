@@ -57,22 +57,31 @@ def data_values(acc, data):
     acc.append(data)
     return acc
 
+# Instantiate the Bytewax Dataflow
 flow = Dataflow()
-flow.input("reference dataset", CSVInput("app/data/inference_data.csv"))
 
-#reformat to tuple
+# Read reference dataset CSV file 
+flow.input("reference dataset", CSVInput("app/data/inference_data.csv"))  
+
+# Map data to tuples containing label 
 flow.map(lambda data: (data['label'], data))
 
+# Configure windowing using SystemClock and TumblingWindow
 clock_config = SystemClockConfig()
-
 window_config = TumblingWindow(
         length=timedelta(minutes=3), align_to=datetime.now(timezone.utc).replace(minute=1, second=0, microsecond=0)
     )
-flow.fold_window("sum", clock_config, window_config,list,data_values)
 
+# Fold data into windows by label, accumulating lists
+flow.fold_window("sum", clock_config, window_config, list, data_values)
+
+# Generate data drift report for each window
 flow.map(generate_dashboard)
-flow.output("out", StdOutput())
 
+# Write drift report to standard output
+flow.output("out", StdOutput())  
+
+# Execute the workflow
 if __name__== "__main__":
     run_main(flow)
-
+    
