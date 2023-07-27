@@ -1,20 +1,45 @@
 # from bytewax.connectors.kafka import KafkaInput
 # from bytewax.inputs import DynamicInput, StatelessSource
 # from bytewax.connectors.stdio import StdOutput
+from datetime import datetime, timedelta, timezone
 
 import operator
 from bytewax.testing import TestingInput
 from datetime import timedelta, datetime, timezone
-from app.dashboard import retrieve_all_data, generate_dashboard,load_reference_data
+from app.dashboard import generate_dashboard
 from bytewax.inputs import DynamicInput, StatelessSource
 from bytewax.dataflow import Dataflow
 from bytewax.connectors.stdio import StdOutput
-from bytewax.window import SystemClockConfig, TumblingWindow
-from bytewax.connectors.files import FileInput
+from bytewax.window import SystemClockConfig, SlidingWindow,TumblingWindow,EventClockConfig
+from bytewax.connectors.files import FileInput, CSVInput
+import pandas as pd
+from datetime import datetime, timedelta, timezone
 # Bytewax has input and output helpers for common input and output data sources
 # but you can also create your own with the ManualOutputConfig.
 
 from bytewax.testing import run_main
+from pydantic import BaseModel, confloat, conint
+
+class PatientData(BaseModel):
+    
+    diarrhea: conint(ge=0, le=1)
+    itchy_nose: conint(ge=0, le=1)
+    itchy_eyes: conint(ge=0, le=1)  
+    itchy_mouth: conint(ge=0, le=1)
+    itchy_inner_ear: conint(ge=0, le=1) 
+    redness_of_eyes: conint(ge=0, le=1)
+    label: conint(ge=0, le=1)
+
+
+
+
+def convert_value_str_to_int(data):
+    print(data)
+    df = pd.DataFrame(data, index=[0])
+    df = df.apply(pd.to_numeric, errors='ignore')
+    # Convert back to dict
+    data = df.to_dict(orient='records')[0]
+    return data
 
 
 
@@ -28,20 +53,26 @@ def count(counts, typ):
 
 
 
+def data_values(acc, data):
+    acc.append(data)
+    return acc
 
 flow = Dataflow()
-flow.input("inp", FileInput("DATA_WINDOW_SIZE.txt"))
-flow.map(generate_dashboard)
+flow.input("reference dataset", CSVInput("app/data/inference_data.csv"))
+
+#reformat to tuple
+flow.map(lambda data: (data['label'], data))
 
 clock_config = SystemClockConfig()
+
 window_config = TumblingWindow(
-        length=timedelta(seconds=10), align_to=datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
+        length=timedelta(minutes=3), align_to=datetime.now(timezone.utc).replace(minute=1, second=0, microsecond=0)
     )
-flow.fold_window("count", clock_config, window_config, dict, count)
-# flow.reduce_window("sum", clock_config, window_config)
+flow.fold_window("sum", clock_config, window_config,list,data_values)
+
+flow.map(generate_dashboard)
 flow.output("out", StdOutput())
 
-
-if __name__ == "__main__":
+if __name__== "__main__":
     run_main(flow)
 
