@@ -1,6 +1,4 @@
-# from bytewax.connectors.kafka import KafkaInput
-# from bytewax.inputs import DynamicInput, StatelessSource
-# from bytewax.connectors.stdio import StdOutput
+
 from datetime import datetime, timedelta, timezone
 
 import operator
@@ -14,45 +12,9 @@ from bytewax.window import SystemClockConfig, SlidingWindow,TumblingWindow,Event
 from bytewax.connectors.files import FileInput, CSVInput
 import pandas as pd
 from datetime import datetime, timedelta, timezone
-# Bytewax has input and output helpers for common input and output data sources
-# but you can also create your own with the ManualOutputConfig.
-
-from bytewax.testing import run_main
-from pydantic import BaseModel, confloat, conint
-
-class PatientData(BaseModel):
-    
-    diarrhea: conint(ge=0, le=1)
-    itchy_nose: conint(ge=0, le=1)
-    itchy_eyes: conint(ge=0, le=1)  
-    itchy_mouth: conint(ge=0, le=1)
-    itchy_inner_ear: conint(ge=0, le=1) 
-    redness_of_eyes: conint(ge=0, le=1)
-    label: conint(ge=0, le=1)
 
 
-
-
-def convert_value_str_to_int(data):
-    print(data)
-    df = pd.DataFrame(data, index=[0])
-    df = df.apply(pd.to_numeric, errors='ignore')
-    # Convert back to dict
-    data = df.to_dict(orient='records')[0]
-    return data
-
-
-
-
-
-def count(counts, typ):
-    if typ not in counts:
-        counts[typ] = 0
-    counts[typ] += 1
-    return counts
-
-
-
+# Define a function to accumulate data into lists per window
 def data_values(acc, data):
     acc.append(data)
     return acc
@@ -61,16 +23,25 @@ def data_values(acc, data):
 flow = Dataflow()
 
 # Read reference dataset CSV file 
-flow.input("reference dataset", CSVInput("app/data/inference_data.csv"))  
+flow.input("reference dataset", CSVInput("app/data/inference_data.csv")) 
+
+
+
+def parse_time(data):
+    data["id"] = datetime.fromtimestamp(float(data["id"]), timezone.utc)
+    return data
+
+flow.map(parse_time)
 
 # Map data to tuples containing label 
 flow.map(lambda data: (data['label'], data))
 
+def get_time(data):
+    return data["id"]
+
 # Configure windowing using SystemClock and TumblingWindow
-clock_config = SystemClockConfig()
-window_config = TumblingWindow(
-        length=timedelta(minutes=3), align_to=datetime.now(timezone.utc).replace(minute=1, second=0, microsecond=0)
-    )
+clock_config = EventClockConfig(get_time, wait_for_system_duration=timedelta(seconds=30))
+window_config = TumblingWindow(length=timedelta(minutes=3), align_to=datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0))
 
 # Fold data into windows by label, accumulating lists
 flow.fold_window("sum", clock_config, window_config, list, data_values)
@@ -81,7 +52,3 @@ flow.map(generate_dashboard)
 # Write drift report to standard output
 flow.output("out", StdOutput())  
 
-# Execute the workflow
-if __name__== "__main__":
-    run_main(flow)
-    

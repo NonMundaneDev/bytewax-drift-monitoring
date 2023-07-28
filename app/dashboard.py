@@ -14,9 +14,9 @@ from evidently.test_suite import TestSuite
 from evidently.tests import *
 
 
-current_data =pd.read_csv('app/data/training_data.csv')
+ref_data =pd.read_csv('app/data/training_data.csv')
 
-def generate_dashboard(ref_data) -> str:
+def generate_dashboard(current_data) -> str:
     """
     Generates a data drift dashboard of the Kolmogorov-Smirnov (KS) test.
 
@@ -27,20 +27,18 @@ def generate_dashboard(ref_data) -> str:
     """
     dashboard_name = "app/static/file.html"
 
-    ref_label, reference_dataset= ref_data
+    current_data_label, current_dataset= current_data
     
     report = Report(metrics=[
         DataDriftPreset(drift_share=0.05,stattest='ks',stattest_threshold=0.05),
         TargetDriftPreset()
         ])
    
-    df_reference_dataset =pd.DataFrame(reference_dataset)
-    df_reference_dataset_clean = df_reference_dataset.apply(pd.to_numeric, errors='ignore')
-    report.run(reference_data=df_reference_dataset_clean.drop(columns='label'), current_data=current_data.drop(columns='label'))
+    df_current_dataset =pd.DataFrame(current_dataset)
+    df_current_dataset_clean = df_current_dataset.apply(pd.to_numeric, errors='ignore')
+    report.run(reference_data=ref_data.drop(columns='label'), current_data=df_current_dataset_clean.drop(columns='label'))
 
     report.save_html(dashboard_name)
     
     logging.info(f"Dashboard saved to {dashboard_name}")
     return ('result', dashboard_name)
-
-

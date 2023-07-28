@@ -3,3 +3,4 @@
 /app/data/train_data.csv
 __pycache__
 venv
+/app/data/.ipynb_checkpoints
