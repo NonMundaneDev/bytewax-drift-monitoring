@@ -21,7 +21,7 @@ def generate_dashboard(current_data) -> str:
     Generates a data drift dashboard of the Kolmogorov-Smirnov (KS) test.
 
     Args:
-        ref_data (list): list of data in a window
+        current_data(list): list of data in a window
     Returns:
         str: The path to the generated dashboard file.
     """
